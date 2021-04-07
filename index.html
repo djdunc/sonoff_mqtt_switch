@@ -1,0 +1,137 @@
+<!-- 
+   Web page to control Sonoff switches via MQTT.
+   MQTT broker is machine on local network at address 192.168.1.140. This page is hosted on local network. 
+   Duncan Wilson, April 2021
+
+   TODO: work out better way to pass in password for MQTT broker.
+-->
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Garden</title>
+    
+    <script src="./scripts/paho-mqtt-min.js" type="text/javascript"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <link rel="stylesheet" href="./styles/styles.css">
+    
+
+    <script >
+        // Define an MQTT broker - uses websockets hence port 9001
+        mqtt = new Paho.MQTT.Client("192.168.1.140", Number(9001), "gardenweb");
+        
+        // set callback handlers
+        mqtt.onMessageArrived = onMessageArrived;
+
+        // define the topics we want to connect to
+        var mqtt_topics = [ 
+            "house/son-outside-lights/relay/0", 
+            "house/son-pump/relay/0",
+            "house/son-pump-back/relay/0"
+        ];
+
+        // also defining some human readable labels for the topics to be used in the html
+        var mqtt_topics_labels = [ 
+            "Outside Lights", 
+            "Fish Pump",
+            "Back Pump"
+        ];
+
+        // connect to MQTT broker and report in console - if successful call the onConnect function
+        mqtt.connect({
+            userName: 'MQTT USER NAME GOES IN HERE',
+            password: 'MQTT PASSWORD GOES IN HERE',
+            onSuccess: function() { 
+                console.log("connected!"); 
+                onConnect();
+            },
+            //Gets Called if the connection could not be established
+            onFailure: function (message) {
+                console.log("Connection failed: " + message.errorMessage);
+            }
+        });
+        
+        // a publish function to toggle the state of the switch based on topic passed in
+        function toggleSonoff(topic) {
+            console.log("toggleSonoff " + topic);
+            message = new Paho.MQTT.Message("2"); // 0 = on, 1 = off, 2 = toggle
+            message.destinationName = topic + "/set";
+            mqtt.send(message);
+        };
+
+        // function to run when connecting to the broker: 
+        // generates the list of html to be added to the page based on mqtt_topics array
+        // and subscribes to that list of topics
+        function onConnect(){
+            for(var i=0; i<mqtt_topics.length; i++){
+		        console.log("Registering :- " + mqtt_topics[i]); 
+                
+                // create html to insert into webpage
+                setupTopicHTML(i, mqtt_topics[i]);
+
+                // Subscribe to Topics
+                mqtt.subscribe(mqtt_topics[i]);
+            }
+        }
+
+        // create html to add to the page for each topic - done once when page connects to broker
+        // uses JQuery append() to add in rows to html document
+        function setupTopicHTML(id, name){
+            var topic_row = "<div class='topicRow'> \
+                    <span class='row " + name + " topic-msg-" +id+ "'> \
+                    <button class='button buttonoff' onclick=toggleSonoff('"+name+"')>"+mqtt_topics_labels[id]+"</button> \
+                    </span> \
+                    </div>"
+            $("#topic").append(topic_row);
+        }        
+
+        // update the button html when its state changes and overwrite the html in the span containing topic_msg_xx
+        function addMessage(id, topic, msg){
+            if (msg == 0){
+                msg = "<button class='button buttonoff' onclick=toggleSonoff('"+topic+"')>"+mqtt_topics_labels[id]+"</button>";
+            }else{
+                msg = "<button class='button buttonon' onclick=toggleSonoff('"+topic+"')>"+mqtt_topics_labels[id]+"</button>";
+            }
+
+		    $(".topic-msg-"+id).html(msg);
+        }
+
+        // event handler calls this function when a new message arrives
+        // it checks the topic section of the message payload to see if 
+        // it contains a topic in our mqtt_topics array
+        function onMessageArrived(message) {
+            var topic = message.destinationName;
+            console.log("Topic:" + topic);
+            console.log("Message Arrived: " + message.payloadString);
+            // call search function to see if message topic in array of topics
+            var index = searchStringInArray(topic, mqtt_topics);
+            if (index != -1){
+                // update the html to show change of state of button
+                addMessage(index, topic, message.payloadString);
+            }else{
+                console.log(index);
+            }
+        }
+
+        // helper function to search for a string within an array of strings
+        function searchStringInArray (str, strArray) {
+	    for (var j=0; j<strArray.length; j++) {
+	        if (strArray[j].match(str)) return j;
+	    }
+	    return -1;
+	}        
+            
+    </script>
+
+</head>
+<body>
+    <h1>Garden Switches</h2>
+    <div class="container">
+        <div id="topic"></div>
+    </div>
+</body>
+</html>

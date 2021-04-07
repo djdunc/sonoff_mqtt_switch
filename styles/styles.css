@@ -1,0 +1,17 @@
+body {
+    font-family:Arial, Helvetica, sans-serif;
+}
+.button {
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 32px;
+    margin: 4px 2px;
+    cursor: pointer;
+}
+
+.buttonon {background-color: #38ca3d;} /* Green */
+.buttonoff {background-color: #ba2b00;} /* Red */
